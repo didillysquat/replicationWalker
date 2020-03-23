@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+auth.txt
+cache/
+output/
+readset_csvs/
