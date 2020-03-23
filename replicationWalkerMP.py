@@ -25,7 +25,7 @@ class ReplicationWalkerHandler:
         self.authorisation_tup = self._make_auth_tup()
         self.headers = {'User-Agent': 'Benjamin Hume', 'From': 'benjamin.hume@kaust.edu.sa'}
         self.error_df_list_of_lists = None
-        self.error_df_columns = ['sample_id', 'fwd_fastq_name', 'rev_fastq_name', 'pcr_sample_name', 'pcr_fl_sample_name' ,'dna_sample_name',
+        self.error_df_columns = ['barcode_id', 'readset_name', 'fwd_fastq_name', 'rev_fastq_name', 'pcr_sample_name', 'pcr_fl_sample_name' ,'dna_sample_name',
                                  'difference_category', 'color_code', 'directory']
         self.output_dir = "/home/humebc/projects/tara/replication_testing/output"
         os.makedirs(self.output_dir, exist_ok=True)
@@ -208,13 +208,11 @@ class ReplicationWalkerWorker:
             pcr_sample_name = self.readset_df.at[index_to_use, 'pcr_sample_name']
             dna_sample_name = self.readset_df.at[index_to_use, 'dna_sample_name']
             pcr_fl_sample_name = self.readset_df.at[index_to_use, 'pcr_fl_sample_name']
+
             pcr_names_set.add(pcr_sample_name)
             dna_names_set.add(dna_sample_name)
-            try:
-                fwd_read = [_ for _ in self.fastq_gz_list_current if (base_name in _) and ('R1' in _)][0]
-            except IndexError:
-                foo = 'bar'
-            temp_error_list.append([sample_id, fwd_read, fwd_read.replace('R1', 'R2'), pcr_sample_name, pcr_fl_sample_name, dna_sample_name])
+            fwd_read = [_ for _ in self.fastq_gz_list_current if (base_name in _) and ('R1' in _)][0]
+            temp_error_list.append([sample_id, index_to_use, fwd_read, fwd_read.replace('R1', 'R2'), pcr_sample_name, pcr_fl_sample_name, dna_sample_name])
         # print(fastq_gz_list)
         if (len(pcr_names_set) != len(dna_names_set)) or (len(pcr_names_set) > len(sample_id_set)):
             self._log_method_replication(temp_error_list)
@@ -267,7 +265,7 @@ class ReplicationWalkerWorker:
             pcr_sample_name = self.readset_df.at[index_to_use, 'pcr_sample_name']
             dna_sample_name = self.readset_df.at[index_to_use, 'dna_sample_name']
             pcr_fl_sample_name = self.readset_df.at[index_to_use, 'pcr_fl_sample_name']
-            self.error_df_lists.append([sample_id, read_num, read_num.replace('R1', 'R2'), pcr_sample_name, pcr_fl_sample_name, dna_sample_name, 'sequencing_replicate', 'green', self.current_remote_dir])
+            self.error_df_lists.append([sample_id, index_to_use, read_num, read_num.replace('R1', 'R2'), pcr_sample_name, pcr_fl_sample_name, dna_sample_name, 'sequencing_replicate', 'green', self.current_remote_dir])
 
     def _make_auth_tup(self):
         auth_path = os.path.join(self.exe_path, 'auth.txt')
@@ -288,4 +286,7 @@ class ReplicationWalkerWorker:
         df = pd.concat([coral_readset_df, sed_readset_df, fish_readset_df, plankton_readset_df])
         return df.set_index('readset', drop=True)
 
+# ReplicationWalkerHandler(marker='its2').start_rep_walker_mp()
+# ReplicationWalkerHandler(marker='18s').start_rep_walker_mp()
+ReplicationWalkerHandler(marker='16s_45').start_rep_walker_mp()
 ReplicationWalkerHandler(marker='16s_full_45').start_rep_walker_mp()
