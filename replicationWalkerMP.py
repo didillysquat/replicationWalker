@@ -36,9 +36,19 @@ class ReplicationWalkerHandler:
         soup = BeautifulSoup(requests.get(self.remote_base_dir, auth=self.authorisation_tup, headers=self.headers).text, features="html.parser",)
         worker_base_dirs = [link.string for link in soup.find_all('a') if ((link.string not in ['Name', 'Last modified', 'Size', 'Description', 'Parent Directory', 'NEGATIVE_CONTROLS/', 'NEGATIVE_CONTROL/']) and ('/'.join([self.remote_base_dir.strip('/'), link.string]) not in self.remote_base_dir))]
         worker_base_dirs = [os.path.join(self.remote_base_dir, _) for _ in worker_base_dirs]
+
+        # NB We were originally mapping the rep_walker_list directly to the ReplicationWalkerWork class and running
+        # its _walk function from within the __init__. However this was causing problems when running
+        # for some of the markers and giving us an issue about errors returning the error and recursion (Pool error).
+        # Instead we now pass in instances of the ReplicationWalkerWorker class and then run its _walk method, returning
+        # only the list.
+        # Create a ReplicationWalker for every worker_base_dir
+        rep_walker_list = []
+        for w_dir in worker_base_dirs:
+            rep_walker_list.append(ReplicationWalkerWorker(w_dir))
         with Pool(20) as p:
-            self.error_df_list_of_lists = p.map(ReplicationWalkerWorker, worker_base_dirs)
-        self.error_df_list_of_lists = [_.error_df_lists for _ in self.error_df_list_of_lists]
+            self.error_df_list_of_lists = p.map(self._run_walk_on_rep_walker_item, rep_walker_list)
+        # self.error_df_list_of_lists = [_.error_df_lists for _ in self.error_df_list_of_lists]
         # Now its time to create and write out our df
         data = []
         for _ in self.error_df_list_of_lists:
@@ -52,6 +62,9 @@ class ReplicationWalkerHandler:
             auth_lines = [line.rstrip() for line in f]
         return (auth_lines[0], auth_lines[1])
 
+    @staticmethod
+    def _run_walk_on_rep_walker_item(rep_walker_class_instance):
+        return rep_walker_class_instance._walk()
 
 class ReplicationWalkerWorker:
     #TODO we need to modify this so that it takes in a single directory
@@ -73,7 +86,7 @@ class ReplicationWalkerWorker:
         self.s = requests.Session()
         self.s.auth = self.authorisation_tup
         self.s.headers = self.headers
-        self._walk()
+        # self._walk()
 
     def _walk(self):
         while True:
