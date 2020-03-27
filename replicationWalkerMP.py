@@ -226,29 +226,42 @@ class ReplicationWalkerWorker:
             dna_names_set.add(dna_sample_name)
             fwd_read = [_ for _ in self.fastq_gz_list_current if (base_name in _) and ('R1' in _)][0]
             temp_error_list.append([sample_id, index_to_use, fwd_read, fwd_read.replace('R1', 'R2'), pcr_sample_name, pcr_fl_sample_name, dna_sample_name])
+
         # print(fastq_gz_list)
         if (len(pcr_names_set) != len(dna_names_set)) or (len(pcr_names_set) > len(sample_id_set)):
-            self._log_method_replication(temp_error_list)
+            self._log_red_yellow_replication(rep_type='method_replication', rep_col='red')
         else:
-            self._log_unknown_replication(temp_error_list)
+            self._log_red_yellow_replication(rep_type='unknown_replication', rep_col='yellow')
 
-    def _log_unknown_replication(self, temp_error_list):
+    def _log_red_yellow_replication(self, rep_type, rep_col):
         # Then this a unknown_replication
-        for temp_list in temp_error_list:
-            another_temp_list = []
-            for item in temp_list:
-                another_temp_list.append(item)
-            another_temp_list.extend(['unknown_replication', 'yellow', self.current_remote_dir])
-            self.error_df_lists.append(another_temp_list)
-    
-    def _log_method_replication(self, temp_error_list):
-        # then this is a 'method_replication'
-        for temp_list in temp_error_list:
-            another_temp_list = []
-            for item in temp_list:
-                another_temp_list.append(item)
-            another_temp_list.extend(['method_replication', 'red', self.current_remote_dir])
-            self.error_df_lists.append(another_temp_list)
+        for fastq_fwd in [_ for _ in self.fastq_gz_list_current if 'R1' in _]:
+            barcode_id = fastq_fwd.split('_')[1]
+            if 'BID' in fastq_fwd:
+                element_one = fastq_fwd.split('-')[-3]
+                element_two = fastq_fwd.split('-')[-4].split('_')[-1]
+            else:
+                element_one = fastq_fwd.split('-')[-2]
+                element_two = fastq_fwd.split('-')[-3].split('_')[-1]
+            read_int = int(fastq_fwd.split('_')[-2][-1])
+            readset_str = f'{read_int}_{element_two}.{element_one}'
+            readset_list = [_ for _ in self.readset_df[self.readset_df['sample_id'] == barcode_id].index if
+                          readset_str in _]
+            if len(readset_list) == 1:
+                read_set = readset_list[0]
+            else:
+                raise RuntimeError
+            # now add the relevant info to the error list.s
+            pcr_sample_name = self.readset_df.at[read_set, 'pcr_sample_name']
+            dna_sample_name = self.readset_df.at[read_set, 'dna_sample_name']
+            pcr_fl_sample_name = self.readset_df.at[read_set, 'pcr_fl_sample_name']
+            self.error_df_lists.append(
+                [
+                    barcode_id, read_set, fastq_fwd, fastq_fwd.replace('R1', 'R2'),
+                    pcr_sample_name, pcr_fl_sample_name, dna_sample_name,
+                    rep_type, rep_col, self.current_remote_dir
+                ]
+            )
 
     def _process_seq_replication(self):
         # Then this is a case of sequence_replication
@@ -299,7 +312,7 @@ class ReplicationWalkerWorker:
         df = pd.concat([coral_readset_df, sed_readset_df, fish_readset_df, plankton_readset_df])
         return df.set_index('readset', drop=True)
 
-# ReplicationWalkerHandler(marker='its2').start_rep_walker_mp()
-# ReplicationWalkerHandler(marker='18s').start_rep_walker_mp()
-ReplicationWalkerHandler(marker='16s_45').start_rep_walker_mp()
-ReplicationWalkerHandler(marker='16s_full_45').start_rep_walker_mp()
+ReplicationWalkerHandler(marker='its2').start_rep_walker_mp()
+ReplicationWalkerHandler(marker='18s').start_rep_walker_mp()
+ReplicationWalkerHandler(marker='16s_45').start_rep_walker_mp() 
+# ReplicationWalkerHandler(marker='16s_full_45').start_rep_walker_mp()
